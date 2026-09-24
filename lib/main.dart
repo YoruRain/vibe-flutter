@@ -20,8 +20,8 @@ class VibeApp extends StatelessWidget {
 
 class Project {
   Project(this.name, this.note, this.icon, this.color);
-  final String name;
-  final String note;
+  String name;
+  String note;
   final IconData icon;
   final Color color;
 }
@@ -85,6 +85,22 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  Future<void> _openProject(Project project) async {
+    final deleted = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ProjectDetailPage(project: project),
+      ),
+    );
+
+    if (!mounted) return;
+    setState(() {
+      if (deleted == true) {
+        _projects.remove(project);
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     body: SafeArea(
@@ -95,8 +111,13 @@ class _HomeScreenState extends State<HomeScreen> {
             projects: _projects,
             onNewProject: _addProject,
             onSeeProjects: () => setState(() => _tab = 1),
+            onOpenProject: _openProject,
           ),
-          _ProjectsContent(projects: _projects, onNewProject: _addProject),
+          _ProjectsContent(
+            projects: _projects,
+            onNewProject: _addProject,
+            onOpenProject: _openProject,
+          ),
           const _AboutContent(),
         ],
       ),
@@ -130,10 +151,12 @@ class _HomeContent extends StatelessWidget {
     required this.projects,
     required this.onNewProject,
     required this.onSeeProjects,
+    required this.onOpenProject,
   });
   final List<Project> projects;
   final VoidCallback onNewProject;
   final VoidCallback onSeeProjects;
+  final ValueChanged<Project> onOpenProject;
 
   @override
   Widget build(BuildContext context) => ListView(
@@ -229,7 +252,7 @@ class _HomeContent extends StatelessWidget {
       ),
       const SizedBox(height: 8),
       for (final project in projects.take(2)) ...[
-        _ProjectCard(project: project),
+        _ProjectCard(project: project, onTap: () => onOpenProject(project)),
         const SizedBox(height: 12),
       ],
     ],
@@ -269,80 +292,360 @@ class _StatCard extends StatelessWidget {
 }
 
 class _ProjectCard extends StatelessWidget {
-  const _ProjectCard({required this.project});
+  const _ProjectCard({required this.project, required this.onTap});
+  final Project project;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: Colors.white,
+    borderRadius: BorderRadius.circular(18),
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(18),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: project.color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(project.icon, color: project.color),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    project.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    project.note,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Color(0xFF68748B)),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: Color(0xFF9AA3B6)),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+class _ProjectsContent extends StatefulWidget {
+  const _ProjectsContent({
+    required this.projects,
+    required this.onNewProject,
+    required this.onOpenProject,
+  });
+  final List<Project> projects;
+  final VoidCallback onNewProject;
+  final ValueChanged<Project> onOpenProject;
+
+  @override
+  State<_ProjectsContent> createState() => _ProjectsContentState();
+}
+
+class _ProjectsContentState extends State<_ProjectsContent> {
+  final _searchController = TextEditingController();
+  String _query = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(_updateSearch);
+  }
+
+  void _updateSearch() {
+    setState(() => _query = _searchController.text.trim().toLowerCase());
+  }
+
+  @override
+  void dispose() {
+    _searchController
+      ..removeListener(_updateSearch)
+      ..dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final filteredProjects = widget.projects.where((project) {
+      return project.name.toLowerCase().contains(_query);
+    }).toList();
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
+      children: [
+        const Text(
+          '我的项目',
+          style: TextStyle(fontSize: 29, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 6),
+        const Text('你的想法，都从这里开始。', style: TextStyle(color: Color(0xFF68748B))),
+        const SizedBox(height: 20),
+        TextField(
+          controller: _searchController,
+          decoration: InputDecoration(
+            hintText: '搜索项目名称',
+            prefixIcon: const Icon(Icons.search),
+            suffixIcon: _query.isEmpty
+                ? null
+                : IconButton(
+                    tooltip: '清空搜索',
+                    onPressed: _searchController.clear,
+                    icon: const Icon(Icons.close),
+                  ),
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide.none,
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+        FilledButton.icon(
+          onPressed: widget.onNewProject,
+          icon: const Icon(Icons.add),
+          label: const Text('新建项目'),
+        ),
+        const SizedBox(height: 22),
+        if (filteredProjects.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 36),
+            child: Column(
+              children: [
+                const Icon(
+                  Icons.search_off,
+                  size: 48,
+                  color: Color(0xFF9AA3B6),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  _query.isEmpty ? '还没有项目' : '没有找到相关项目',
+                  style: const TextStyle(color: Color(0xFF68748B)),
+                ),
+              ],
+            ),
+          ),
+        for (final project in filteredProjects) ...[
+          _ProjectCard(
+            project: project,
+            onTap: () => widget.onOpenProject(project),
+          ),
+          const SizedBox(height: 12),
+        ],
+      ],
+    );
+  }
+}
+
+class ProjectDetailPage extends StatefulWidget {
+  const ProjectDetailPage({super.key, required this.project});
   final Project project;
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(18),
+  State<ProjectDetailPage> createState() => _ProjectDetailPageState();
+}
+
+class _ProjectDetailPageState extends State<ProjectDetailPage> {
+  Future<void> _editProject() async {
+    final updatedProject = await showDialog<Project>(
+      context: context,
+      builder: (context) => _EditProjectDialog(project: widget.project),
+    );
+
+    if (!mounted || updatedProject == null) return;
+    setState(() {
+      widget.project.name = updatedProject.name;
+      widget.project.note = updatedProject.note;
+    });
+  }
+
+  Future<void> _deleteProject() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('删除项目？'),
+        content: Text('“${widget.project.name}”删除后无法恢复。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('确认删除'),
+          ),
+        ],
+      ),
+    );
+
+    if (!mounted || confirmed != true) return;
+    Navigator.pop(context, true);
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(
+      title: const Text('项目详情'),
+      backgroundColor: const Color(0xFFF7F8FC),
+      actions: [
+        TextButton.icon(
+          onPressed: _editProject,
+          icon: const Icon(Icons.edit_outlined),
+          label: const Text('编辑'),
+        ),
+        const SizedBox(width: 8),
+      ],
     ),
-    child: Row(
+    body: ListView(
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
       children: [
         Container(
-          width: 48,
-          height: 48,
+          padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: project.color.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(14),
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
           ),
-          child: Icon(project.icon, color: project.color),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                project.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 16,
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: widget.project.color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Icon(
+                  widget.project.icon,
+                  color: widget.project.color,
+                  size: 32,
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 22),
               Text(
-                project.note,
-                style: const TextStyle(color: Color(0xFF68748B)),
+                widget.project.name,
+                style: const TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF18223B),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                widget.project.note.isEmpty ? '暂无备注' : widget.project.note,
+                style: const TextStyle(
+                  color: Color(0xFF68748B),
+                  fontSize: 16,
+                  height: 1.5,
+                ),
               ),
             ],
           ),
+        ),
+        const SizedBox(height: 24),
+        OutlinedButton.icon(
+          onPressed: _deleteProject,
+          style: OutlinedButton.styleFrom(
+            foregroundColor: Colors.red,
+            side: const BorderSide(color: Colors.red),
+          ),
+          icon: const Icon(Icons.delete_outline),
+          label: const Text('删除项目'),
         ),
       ],
     ),
   );
 }
 
-class _ProjectsContent extends StatelessWidget {
-  const _ProjectsContent({required this.projects, required this.onNewProject});
-  final List<Project> projects;
-  final VoidCallback onNewProject;
+class _EditProjectDialog extends StatefulWidget {
+  const _EditProjectDialog({required this.project});
+  final Project project;
 
   @override
-  Widget build(BuildContext context) => ListView(
-    padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
-    children: [
-      const Text(
-        '我的项目',
-        style: TextStyle(fontSize: 29, fontWeight: FontWeight.bold),
+  State<_EditProjectDialog> createState() => _EditProjectDialogState();
+}
+
+class _EditProjectDialogState extends State<_EditProjectDialog> {
+  late final TextEditingController _nameController;
+  late final TextEditingController _noteController;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.project.name);
+    _noteController = TextEditingController(text: widget.project.note);
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _noteController.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    final name = _nameController.text.trim();
+    if (name.isEmpty) return;
+
+    Navigator.pop(
+      context,
+      Project(
+        name,
+        _noteController.text.trim(),
+        widget.project.icon,
+        widget.project.color,
       ),
-      const SizedBox(height: 6),
-      const Text('你的想法，都从这里开始。', style: TextStyle(color: Color(0xFF68748B))),
-      const SizedBox(height: 20),
-      FilledButton.icon(
-        onPressed: onNewProject,
-        icon: const Icon(Icons.add),
-        label: const Text('新建项目'),
-      ),
-      const SizedBox(height: 22),
-      for (final project in projects) ...[
-        _ProjectCard(project: project),
-        const SizedBox(height: 12),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('编辑项目'),
+    content: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        TextField(
+          controller: _nameController,
+          autofocus: true,
+          maxLength: 30,
+          textInputAction: TextInputAction.next,
+          decoration: const InputDecoration(labelText: '项目名称'),
+        ),
+        TextField(
+          controller: _noteController,
+          maxLength: 80,
+          maxLines: 3,
+          decoration: const InputDecoration(labelText: '备注'),
+        ),
       ],
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('取消'),
+      ),
+      FilledButton(onPressed: _save, child: const Text('保存')),
     ],
   );
 }
