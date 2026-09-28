@@ -8,10 +8,12 @@ class ProjectDetailPage extends StatefulWidget {
     super.key,
     required this.project,
     required this.onProjectUpdated,
+    required this.onProjectDeleted,
   });
 
   final Project project;
-  final Future<void> Function(Project project) onProjectUpdated;
+  final Future<Project?> Function(Project project) onProjectUpdated;
+  final Future<bool> Function(String id) onProjectDeleted;
 
   @override
   State<ProjectDetailPage> createState() => _ProjectDetailPageState();
@@ -19,6 +21,7 @@ class ProjectDetailPage extends StatefulWidget {
 
 class _ProjectDetailPageState extends State<ProjectDetailPage> {
   late Project _project;
+  bool _isSubmitting = false;
 
   @override
   void initState() {
@@ -33,8 +36,13 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     );
 
     if (!mounted || updatedProject == null) return;
-    setState(() => _project = updatedProject);
-    await widget.onProjectUpdated(updatedProject);
+    setState(() => _isSubmitting = true);
+    final savedProject = await widget.onProjectUpdated(updatedProject);
+    if (!mounted) return;
+    setState(() {
+      _isSubmitting = false;
+      if (savedProject != null) _project = savedProject;
+    });
   }
 
   Future<void> _deleteProject() async {
@@ -58,7 +66,14 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     );
 
     if (!mounted || confirmed != true) return;
-    Navigator.pop(context, true);
+    setState(() => _isSubmitting = true);
+    final deleted = await widget.onProjectDeleted(_project.id);
+    if (!mounted) return;
+    if (deleted) {
+      Navigator.pop(context, true);
+    } else {
+      setState(() => _isSubmitting = false);
+    }
   }
 
   @override
@@ -68,7 +83,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
       backgroundColor: const Color(0xFFF7F8FC),
       actions: [
         TextButton.icon(
-          onPressed: _editProject,
+          onPressed: _isSubmitting ? null : _editProject,
           icon: const Icon(Icons.edit_outlined),
           label: const Text('编辑'),
         ),
@@ -119,13 +134,13 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
         ),
         const SizedBox(height: 24),
         OutlinedButton.icon(
-          onPressed: _deleteProject,
+          onPressed: _isSubmitting ? null : _deleteProject,
           style: OutlinedButton.styleFrom(
             foregroundColor: Colors.red,
             side: const BorderSide(color: Colors.red),
           ),
           icon: const Icon(Icons.delete_outline),
-          label: const Text('删除项目'),
+          label: Text(_isSubmitting ? '请求处理中...' : '删除项目'),
         ),
       ],
     ),

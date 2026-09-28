@@ -1,0 +1,18 @@
+{
+  "projects": [
+    {
+      "id": "default-first-app",
+      "name": "我的第一个 App",
+      "note": "从一个想法开始",
+      "icon": 57527,
+      "color": 4281424859
+    },
+    {
+      "id": "default-weekend-ideas",
+      "name": "周末灵感清单",
+      "note": "把想到的点子记下来",
+      "icon": 58236,
+      "color": 4293366073
+    }
+  ]
+}

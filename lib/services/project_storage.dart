@@ -9,12 +9,12 @@ class ProjectStorage {
 
   static const _projectsKey = 'projects';
 
-  Future<List<Project>> loadProjects() async {
+  Future<List<Project>?> loadProjects() async {
     final preferences = await SharedPreferences.getInstance();
     final jsonString = preferences.getString(_projectsKey);
 
     if (jsonString == null) {
-      return List<Project>.from(defaultProjects);
+      return null;
     }
 
     final jsonList = jsonDecode(jsonString);

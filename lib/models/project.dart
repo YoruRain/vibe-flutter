@@ -43,7 +43,7 @@ class Project {
 
   factory Project.fromJson(Map<String, dynamic> json) {
     return Project(
-      id: json['id'] as String,
+      id: json['id'].toString(),
       name: json['name'] as String,
       note: json['note'] as String,
       icon: _iconFromCodePoint((json['icon'] as num).toInt()),
